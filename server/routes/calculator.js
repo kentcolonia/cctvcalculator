@@ -21,10 +21,13 @@ function calcCameraGB(cam, days) {
   };
 }
 
+// POST /api/calculator/calculate
 router.post('/calculate', (req, res) => {
   const { cameras = [], days = 30, overhead = 20 } = req.body;
   if (!cameras.length) return res.status(400).json({ error: 'No cameras provided' });
+
   const overheadDecimal = Math.min(50, Math.max(0, overhead)) / 100;
+
   const cameraResults = cameras.map((cam, i) => {
     const result = calcCameraGB(cam, days);
     return {
@@ -41,16 +44,19 @@ router.post('/calculate', (req, res) => {
       groupTotalGB: result.totalGB,
     };
   });
+
   const rawTotalGB = cameraResults.reduce((sum, c) => sum + c.groupTotalGB, 0);
   const totalGB = rawTotalGB * (1 + overheadDecimal);
   const totalCameras = cameraResults.reduce((sum, c) => sum + c.count, 0);
   const allCamsPerDayGB = cameraResults.reduce((sum, c) => sum + c.perCamPerDayGB * c.count, 0);
+
   const hddSizes = [500, 1000, 2000, 4000, 6000, 8000, 10000, 12000, 14000, 16000];
   const hddOptions = hddSizes
     .map((size) => ({ sizeGB: size, count: Math.ceil(totalGB / size) }))
     .filter((x) => x.count >= 1 && x.count <= 8)
     .slice(0, 5);
   const recommended = hddOptions.find((x) => x.count <= 2) || hddOptions[hddOptions.length - 1];
+
   res.json({
     cameraResults,
     totalCameras,
@@ -59,6 +65,56 @@ router.post('/calculate', (req, res) => {
     totalGB: +totalGB.toFixed(2),
     hddOptions,
     recommended,
+  });
+});
+
+// POST /api/calculator/days-from-storage
+// Given existing storage and cameras, how many days can they record?
+router.post('/days-from-storage', (req, res) => {
+  const { cameras = [], storageGB = 0, overhead = 20 } = req.body;
+  if (!cameras.length) return res.status(400).json({ error: 'No cameras provided' });
+  if (!storageGB || storageGB <= 0) return res.status(400).json({ error: 'Invalid storage size' });
+
+  const overheadDecimal = Math.min(50, Math.max(0, overhead)) / 100;
+
+  // Usable storage after overhead
+  const usableGB = storageGB / (1 + overheadDecimal);
+
+  const cameraDetails = cameras.map((cam, i) => {
+    const r = calcCameraGB(cam, 1); // per day
+    return {
+      id: cam.id || i,
+      name: cam.name || 'Camera ' + (i + 1),
+      resolution: cam.resolution,
+      codec: cam.codec,
+      fps: cam.fps,
+      hoursPerDay: cam.hoursPerDay,
+      motionFactor: cam.motionFactor,
+      count: r.count,
+      bitrateMbps: r.bitrateMbps,
+      perCamPerDayGB: r.perCamPerDayGB,
+      groupPerDayGB: +(r.perCamPerDayGB * r.count).toFixed(4),
+    };
+  });
+
+  const totalPerDayGB = cameraDetails.reduce((sum, c) => sum + c.groupPerDayGB, 0);
+  const recordingDays = totalPerDayGB > 0 ? Math.floor(usableGB / totalPerDayGB) : 0;
+
+  // Breakdown: how many days each group contributes to filling storage
+  const storageBreakdown = cameraDetails.map(c => ({
+    ...c,
+    daysUntilFull: totalPerDayGB > 0 ? Math.floor(usableGB / c.groupPerDayGB) : 0,
+    percentOfDaily: +((c.groupPerDayGB / totalPerDayGB) * 100).toFixed(1),
+  }));
+
+  res.json({
+    storageGB,
+    usableGB: +usableGB.toFixed(2),
+    totalPerDayGB: +totalPerDayGB.toFixed(4),
+    recordingDays,
+    recordingWeeks: +(recordingDays / 7).toFixed(1),
+    recordingMonths: +(recordingDays / 30).toFixed(1),
+    storageBreakdown,
   });
 });
 

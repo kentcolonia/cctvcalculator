@@ -1,146 +1,176 @@
 import React from 'react';
 
 function fmtGB(gb) {
-  if (!gb && gb !== 0) return '—';
+  if (gb === undefined || gb === null) return { val: '—', unit: '' };
   if (gb >= 1000) return { val: (gb / 1000).toFixed(2), unit: 'TB' };
   return { val: Math.round(gb), unit: 'GB' };
 }
 
-function StorageDisplay({ gb, large }) {
-  const f = fmtGB(gb);
-  if (!f || f === '—') return <span style={{ color: 'rgba(255,255,255,0.3)' }}>—</span>;
+const CODEC_LABELS = { mjpeg: 'MJPEG', h264: 'H.264', h265: 'H.265', h265plus: 'H.265+' };
+const RES_LABELS = { 0.5: 'D1', 1: '720p', 2: '1080p', 4: '4MP', 5: '3K', 8: '4K', 12: '4K+' };
+
+function Card({ icon, label, value, unit, accent }) {
   return (
-    <span>
-      <span style={{ fontSize: large ? 36 : 22, fontWeight: 700,
-        fontFamily: "'JetBrains Mono', monospace", letterSpacing: '-0.02em' }}>
-        {f.val}
-      </span>
-      <span style={{ fontSize: large ? 14 : 11, fontWeight: 500,
-        color: 'rgba(255,255,255,0.45)', marginLeft: 4 }}>
-        {f.unit}
-      </span>
-    </span>
+    <div style={{
+      background: accent ? 'var(--text)' : 'var(--surface)',
+      border: accent ? 'none' : '1px solid var(--border)',
+      borderRadius: 'var(--radius)', padding: '20px 22px',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+        <span style={{ fontSize: 18 }}>{icon}</span>
+        <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em',
+          textTransform: 'uppercase', color: accent ? 'rgba(255,255,255,0.45)' : 'var(--text-3)' }}>
+          {label}
+        </span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+        <span style={{ fontSize: 32, fontWeight: 700, letterSpacing: '-0.02em',
+          fontFamily: "'JetBrains Mono', monospace",
+          color: accent ? '#fff' : 'var(--text)' }}>
+          {value}
+        </span>
+        {unit && (
+          <span style={{ fontSize: 14, fontWeight: 500,
+            color: accent ? 'rgba(255,255,255,0.45)' : 'var(--text-3)' }}>
+            {unit}
+          </span>
+        )}
+      </div>
+    </div>
   );
 }
 
 export default function ResultPanel({ result, loading }) {
   if (!result) return null;
 
-  return (
-    <div style={{
-      background: 'var(--text)', borderRadius: 'var(--radius)',
-      padding: '2rem', opacity: loading ? 0.75 : 1, transition: 'opacity 0.2s',
-    }}>
+  const total = fmtGB(result.totalGB);
+  const perDay = fmtGB(result.allCamsPerDayGB);
+  const raw = fmtGB(result.rawTotalGB);
 
-      {/* Top label */}
+  return (
+    <div style={{ opacity: loading ? 0.6 : 1, transition: 'opacity 0.2s' }}>
+
       <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em',
-        textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', marginBottom: '1.5rem' }}>
+        textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: 14 }}>
         Storage estimate
       </p>
 
-      {/* Hero number */}
-      <div style={{ marginBottom: '1.75rem' }}>
-        <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 6 }}>
-          Total storage required
-        </p>
-        <StorageDisplay gb={result.totalGB} large />
+      {/* Top cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
+        <Card icon="💾" label="Total storage" value={total.val} unit={total.unit} accent />
+        <Card icon="📅" label="Daily usage" value={perDay.val} unit={perDay.unit} />
+        <Card icon="📷" label="Total cameras" value={result.totalCameras} unit="cams" />
       </div>
 
-      {/* Stats row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
-        gap: 1, background: 'rgba(255,255,255,0.08)', borderRadius: 12,
-        overflow: 'hidden', marginBottom: '1.75rem' }}>
-        {[
-          { label: 'Total cameras', value: result.totalCameras, mono: true, raw: true },
-          { label: 'All cams / day', gb: result.allCamsPerDayGB },
-          { label: 'Raw (no overhead)', gb: result.rawTotalGB },
-        ].map((s, i) => (
-          <div key={i} style={{ background: 'rgba(255,255,255,0.04)', padding: '16px 18px' }}>
-            <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.08em',
-              textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', marginBottom: 8 }}>
-              {s.label}
-            </p>
-            {s.raw
-              ? <span style={{ fontSize: 22, fontWeight: 700,
-                  fontFamily: "'JetBrains Mono', monospace", color: '#fff' }}>
-                  {s.value}
-                </span>
-              : <StorageDisplay gb={s.gb} />
-            }
+      {/* Secondary row */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+        <Card icon="📦" label="Raw (no overhead)" value={raw.val} unit={raw.unit} />
+        <div style={{
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 'var(--radius)', padding: '20px 22px',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+            <span style={{ fontSize: 18 }}>🖴</span>
+            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em',
+              textTransform: 'uppercase', color: 'var(--text-3)' }}>
+              Recommended drive
+            </span>
           </div>
-        ))}
+          {result.recommended && (
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+              <span style={{ fontSize: 32, fontWeight: 700, letterSpacing: '-0.02em',
+                fontFamily: "'JetBrains Mono', monospace", color: 'var(--text)' }}>
+                {result.recommended.count}
+              </span>
+              <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-3)' }}>
+                × {result.recommended.sizeGB >= 1000
+                  ? `${result.recommended.sizeGB / 1000}TB`
+                  : `${result.recommended.sizeGB}GB`} HDD
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Group breakdown */}
-      {result.cameraResults.length > 1 && (
-        <div style={{ marginBottom: '1.75rem' }}>
-          <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em',
-            textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', marginBottom: 10 }}>
-            By group
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {result.cameraResults.map((cam) => {
-              const f = fmtGB(cam.groupTotalGB);
-              return (
-                <div key={cam.id} style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  padding: '10px 14px', borderRadius: 10,
-                  background: 'rgba(255,255,255,0.05)',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 11, fontFamily: "'JetBrains Mono', monospace",
-                      color: 'rgba(255,255,255,0.3)' }}>
-                      ×{cam.count}
-                    </span>
-                    <span style={{ fontSize: 14, fontWeight: 500, color: 'rgba(255,255,255,0.85)' }}>
-                      {cam.name || `Camera group ${cam.id}`}
-                    </span>
-                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)',
-                      fontFamily: "'JetBrains Mono', monospace" }}>
-                      {cam.bitrateMbps} Mbps
-                    </span>
-                  </div>
-                  <span style={{ fontSize: 14, fontWeight: 600,
-                    fontFamily: "'JetBrains Mono', monospace", color: 'rgba(255,255,255,0.7)' }}>
-                    {f.val} {f.unit}
+      {/* Per camera breakdown */}
+      {result.cameraResults.length > 0 && (
+        <div style={{
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 'var(--radius)', overflow: 'hidden',
+        }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)',
+            display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 16 }}>📋</span>
+            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em',
+              textTransform: 'uppercase', color: 'var(--text-3)' }}>
+              Breakdown by camera
+            </span>
+          </div>
+          {result.cameraResults.map((cam, i) => {
+            const g = fmtGB(cam.groupTotalGB);
+            return (
+              <div key={cam.id} style={{
+                display: 'grid', gridTemplateColumns: '1fr auto',
+                alignItems: 'center', padding: '14px 20px',
+                borderBottom: i < result.cameraResults.length - 1 ? '1px solid var(--border)' : 'none',
+              }}>
+                <div>
+                  <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 3 }}>
+                    {cam.name || `Camera ${i + 1}`}
+                  </p>
+                  <p style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                    {cam.count}× · {RES_LABELS[cam.resolution] || cam.resolution + 'MP'} ·{' '}
+                    {CODEC_LABELS[cam.codec]} · {cam.fps}fps · {cam.hoursPerDay}h/day · {cam.bitrateMbps} Mbps
+                  </p>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <span style={{ fontSize: 18, fontWeight: 700,
+                    fontFamily: "'JetBrains Mono', monospace", color: 'var(--text)' }}>
+                    {g.val}
                   </span>
+                  <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 4 }}>{g.unit}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* All HDD options */}
+      {result.hddOptions?.length > 0 && (
+        <div style={{ marginTop: 12, padding: '16px 20px',
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 'var(--radius)' }}>
+          <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em',
+            textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: 12 }}>
+            🖥️ &nbsp;All drive options
+          </p>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {result.hddOptions.map((h) => {
+              const isRec = h.sizeGB === result.recommended?.sizeGB;
+              return (
+                <div key={h.sizeGB} style={{
+                  padding: '7px 14px', borderRadius: 8,
+                  border: isRec ? '1.5px solid var(--text)' : '1px solid var(--border)',
+                  background: isRec ? 'var(--text)' : 'transparent',
+                }}>
+                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13,
+                    fontWeight: isRec ? 600 : 400,
+                    color: isRec ? '#fff' : 'var(--text-2)' }}>
+                    {h.count} × {h.sizeGB >= 1000 ? `${h.sizeGB / 1000}TB` : `${h.sizeGB}GB`}
+                  </span>
+                  {isRec && (
+                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)',
+                      marginLeft: 6, fontWeight: 600, letterSpacing: '0.06em' }}>
+                      REC
+                    </span>
+                  )}
                 </div>
               );
             })}
           </div>
         </div>
       )}
-
-      {/* HDD options */}
-      <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '1.25rem' }}>
-        <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em',
-          textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', marginBottom: 10 }}>
-          Drive configuration
-        </p>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {result.hddOptions.map((h) => {
-            const isRec = h.sizeGB === result.recommended?.sizeGB;
-            return (
-              <div key={h.sizeGB} style={{
-                padding: '8px 16px', borderRadius: 8,
-                border: isRec ? '1px solid rgba(255,255,255,0.4)' : '1px solid rgba(255,255,255,0.12)',
-                background: isRec ? 'rgba(255,255,255,0.12)' : 'transparent',
-              }}>
-                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13,
-                  fontWeight: isRec ? 600 : 400, color: isRec ? '#fff' : 'rgba(255,255,255,0.5)' }}>
-                  {h.count} × {h.sizeGB >= 1000 ? `${h.sizeGB / 1000}TB` : `${h.sizeGB}GB`}
-                </span>
-                {isRec && (
-                  <span style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.4)',
-                    marginLeft: 8, letterSpacing: '0.06em' }}>
-                    REC
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
     </div>
   );
 }
